@@ -90,6 +90,7 @@ def main():
         if epoch % 1000 == 0:
             print(f"Epoch {epoch}")
         discriminator.train(generate_real().to(device), target_real)
+        # TODO: merge these two steps
         discriminator.train(generator.forward(generator_input), target_generated)
         generator.train(discriminator, generator_input, target_real)
 
