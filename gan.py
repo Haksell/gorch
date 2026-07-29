@@ -5,6 +5,7 @@
 import pickle
 from random import gauss
 
+import numpy as np
 import pandas as pd
 import torch
 from matplotlib import pyplot as plt
@@ -29,7 +30,8 @@ class Discriminator(nn.Module):
         )
         self.loss_function = nn.MSELoss()  # TODO: BCELoss()
         self.optimizer = torch.optim.Adam(self.parameters())
-        self.progress = []
+        self.progress_real = []
+        self.progress_generated = []
 
     def forward(self, inputs):
         return self.model(inputs)
@@ -40,7 +42,12 @@ class Discriminator(nn.Module):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-        self.progress.append(loss.item())
+
+        # TODO: clean after batch training
+        progress = (
+            self.progress_generated if targets.item() == 0 else self.progress_real
+        )
+        progress.append(loss.item())
 
 
 class Generator(nn.Module):
@@ -68,13 +75,26 @@ class Generator(nn.Module):
         self.optimizer.step()
 
 
-def plots(discriminator, generator):
-    df = pd.DataFrame(discriminator.progress, columns=["loss"])
-    df.plot(ylim=(0, 1), figsize=(16, 8), alpha=0.5, marker=".", grid=True)
-    plt.show()
+def plots(discriminator, generator, image_list):
+    df = pd.DataFrame(
+        np.array(
+            [
+                discriminator.progress_real,
+                discriminator.progress_generated,
+                generator.progress,
+            ]
+        ).T,
+        columns=[
+            "discriminator loss: real",
+            "discriminator loss: generated",
+            "generator loss",
+        ],
+    )
+    df.plot(figsize=(16, 8), alpha=0.5, marker=".", grid=True)
 
-    df = pd.DataFrame(generator.progress, columns=["loss"])
-    df.plot(ylim=(0, 1), figsize=(16, 8), alpha=0.5, marker=".", grid=True)
+    plt.figure(figsize=(16, 8))
+    plt.imshow(np.array(image_list).T, interpolation="none", cmap="Reds")
+
     plt.show()
 
 
@@ -83,12 +103,13 @@ def main():
     device = torch.device(device_name)
     print(f"Running on {device_name.upper()}.")
 
-    PKL_GAN_MODELS = "pkl/gan_models.pkl"
+    PKL_GAN = "pkl/gan.pkl"
 
     try:
-        models = pickle.load(open(PKL_GAN_MODELS, "rb"))
-        discriminator = models["discriminator"].to(device)
-        generator = models["generator"].to(device)
+        pickled = pickle.load(open(PKL_GAN, "rb"))
+        discriminator = pickled["discriminator"].to(device)
+        generator = pickled["generator"].to(device)
+        image_list = pickled["image_list"]
     except FileNotFoundError:
         discriminator = Discriminator().to(device)
         generator = Generator().to(device)
@@ -99,24 +120,29 @@ def main():
         # TODO: give different input values to the generator
         generator_input = torch.tensor([0.5]).to(device)
 
-        EPOCHS = 10_000
+        image_list = []
+
+        EPOCHS = 2000
         for epoch in range(1, EPOCHS + 1):
             discriminator.train(generate_real().to(device), target_real)
-            discriminator.train(
-                generator.forward(generator_input).detach(),
-                target_generated,
-            )
+            generated = generator.forward(generator_input).detach()
+            discriminator.train(generated, target_generated)
             generator.train(discriminator, generator_input, target_real)
-            if epoch % 1000 == 0 or epoch == EPOCHS:
+            if epoch % 100 == 0 or epoch == EPOCHS:
                 print(f"Epoch {epoch}/{EPOCHS}")
+                image_list.append(generated.cpu().numpy())
 
         pickle.dump(
-            {"discriminator": discriminator, "generator": generator},
-            open(PKL_GAN_MODELS, "wb"),
+            {
+                "discriminator": discriminator,
+                "generator": generator,
+                "image_list": image_list,
+            },
+            open(PKL_GAN, "wb"),
         )
 
     if PLOTS:
-        plots(discriminator, generator)
+        plots(discriminator, generator, image_list)
 
 
 if __name__ == "__main__":
