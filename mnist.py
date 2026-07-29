@@ -14,7 +14,7 @@ BATCH_SIZE = 256
 
 HIDDEN_NODES = 128
 
-PLOTS = True
+PLOTS = False
 TEST_IDX = 33
 
 
@@ -119,7 +119,7 @@ def main():
         pickle.dump(mnist_test, open(PKL_TEST, "wb"))
 
     try:
-        classifier = pickle.load(open(PKL_CLASSIFIER, "rb"))
+        classifier = pickle.load(open(PKL_CLASSIFIER, "rb")).to(device)
         test_accuracy(classifier, mnist_test)
     except FileNotFoundError:
         classifier = Classifier().to(device)
