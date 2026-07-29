@@ -21,7 +21,7 @@ class Classifier(nn.Module):
             nn.LeakyReLU(0.02),  # TODO: Softmax?
         )
         self.loss_function = nn.MSELoss()  # TODO: CrossEntropyLoss
-        self.optimizer = torch.optim.SGD(self.parameters(), lr=0.01)  # TODO: Adam
+        self.optimizer = torch.optim.Adam(self.parameters())
         self.counter = 0
         self.progress = []
 
