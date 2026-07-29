@@ -1,6 +1,7 @@
+from random import gauss
+
 import matplotlib.pyplot as plt
 import pandas as pd
-from random import gauss
 import torch
 from torch import nn
 
