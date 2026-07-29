@@ -12,7 +12,7 @@ BATCH_SIZE = 256
 
 HIDDEN_NODES = 128
 
-PLOTS = False
+PLOTS = True
 TEST_IDX = 33
 
 
@@ -39,10 +39,6 @@ class Classifier(nn.Module):
         loss.backward()
         self.optimizer.step()
         self.progress.append(loss.item())
-
-    def plot_progress(self):
-        df = pd.DataFrame(self.progress, columns=["loss"])
-        df.plot(ylim=(0, 1), figsize=(16, 8), marker=".", grid=True)
 
 
 class MNIST(Dataset):
@@ -95,7 +91,8 @@ def plots(classifier, mnist_test):
     mnist_test.plot_image(TEST_IDX)
     plt.show()
 
-    classifier.plot_progress()
+    df = pd.DataFrame(classifier.progress, columns=["loss"])
+    df.plot(ylim=(0, 1), figsize=(16, 8), alpha=0.5, marker=".", grid=True)
     plt.show()
 
 
