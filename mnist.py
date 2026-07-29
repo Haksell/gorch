@@ -12,7 +12,9 @@ from torch.utils.data import DataLoader, Dataset
 EPOCHS = 8
 BATCH_SIZE = 256
 
+INPUT_NODES = 784
 HIDDEN_NODES = 128
+OUTPUT_NODES = 10
 
 PLOTS = False
 TEST_IDX = 33
@@ -22,10 +24,10 @@ class Classifier(nn.Module):
     def __init__(self):
         super().__init__()
         self.model = nn.Sequential(
-            nn.Linear(784, HIDDEN_NODES),
+            nn.Linear(INPUT_NODES, HIDDEN_NODES),
             nn.LeakyReLU(0.02),
             nn.LayerNorm(HIDDEN_NODES),
-            nn.Linear(HIDDEN_NODES, 10),
+            nn.Linear(HIDDEN_NODES, OUTPUT_NODES),
         )
         self.loss_function = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.parameters())
