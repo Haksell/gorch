@@ -10,7 +10,6 @@ from torch import nn
 from torch.utils.data import DataLoader, Dataset
 
 EPOCHS = 8
-BATCH_SIZE = 256
 
 INPUT_NODES = 784
 HIDDEN_NODES = 128
@@ -101,8 +100,10 @@ def plots(classifier, mnist_test):
 
 
 def main():
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Running on {str(device).upper()}.")
+    device_name = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device(device_name)
+    batch_size = 512 if device_name == "cuda" else 256
+    print(f"Running on {device_name.upper()}.")
 
     PKL_TRAIN = "pkl/mnist_train.pkl"
     PKL_TEST = "pkl/mnist_test.pkl"
@@ -125,7 +126,7 @@ def main():
         test_accuracy(classifier, mnist_test)
     except FileNotFoundError:
         classifier = Classifier().to(device)
-        data_loader = DataLoader(mnist_train, batch_size=BATCH_SIZE, shuffle=True)
+        data_loader = DataLoader(mnist_train, batch_size=batch_size, shuffle=True)
         for epoch in range(1, EPOCHS + 1):
             print(f"Training epoch {epoch}/{EPOCHS}...")
             for images, labels in data_loader:
