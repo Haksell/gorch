@@ -1,22 +1,24 @@
 # TODO: batch training with a DataLoader
 
+import pickle
+
 import matplotlib.pyplot as plt
 import pandas as pd
-import pickle
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
+from torch import nn
 from torch.utils.data import Dataset
 
 
 class Classifier(nn.Module):
     def __init__(self):
         super().__init__()
+        # TODO: 256 hidden nodes
         self.model = nn.Sequential(
             nn.Linear(784, 200),
-            nn.Sigmoid(),  # TODO: ReLU
+            nn.LeakyReLU(0.02),
             nn.Linear(200, 10),
-            nn.Sigmoid(),  # TODO: Softmax?
+            nn.LeakyReLU(0.02),  # TODO: Softmax?
         )
         self.loss_function = nn.MSELoss()  # TODO: CrossEntropyLoss
         self.optimizer = torch.optim.SGD(self.parameters(), lr=0.01)  # TODO: Adam
@@ -76,11 +78,8 @@ class MNIST(Dataset):
 
 
 def main():
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-        print("Warning: CUDA is not available.")
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"Running on {device}")
 
     PKL_TRAIN = "pkl/mnist_train.pkl"
     PKL_TEST = "pkl/mnist_test.pkl"
