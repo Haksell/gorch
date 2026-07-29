@@ -1,5 +1,8 @@
+# ruff: noqa: SIM115
+
 # TODO: batch training
 
+import pickle
 from random import gauss
 
 import pandas as pd
@@ -7,7 +10,7 @@ import torch
 from matplotlib import pyplot as plt
 from torch import nn
 
-PLOTS = False
+PLOTS = True
 
 
 def generate_real():
@@ -65,8 +68,12 @@ class Generator(nn.Module):
         self.optimizer.step()
 
 
-def plots(discriminator):
+def plots(discriminator, generator):
     df = pd.DataFrame(discriminator.progress, columns=["loss"])
+    df.plot(ylim=(0, 1), figsize=(16, 8), alpha=0.5, marker=".", grid=True)
+    plt.show()
+
+    df = pd.DataFrame(generator.progress, columns=["loss"])
     df.plot(ylim=(0, 1), figsize=(16, 8), alpha=0.5, marker=".", grid=True)
     plt.show()
 
@@ -76,26 +83,40 @@ def main():
     device = torch.device(device_name)
     print(f"Running on {device_name.upper()}.")
 
-    discriminator = Discriminator().to(device)
-    generator = Generator().to(device)
+    PKL_GAN_MODELS = "pkl/gan_models.pkl"
 
-    target_real = torch.tensor([1.0]).to(device)
-    target_generated = torch.tensor([0.0]).to(device)
+    try:
+        models = pickle.load(open(PKL_GAN_MODELS, "rb"))
+        discriminator = models["discriminator"].to(device)
+        generator = models["generator"].to(device)
+    except FileNotFoundError:
+        discriminator = Discriminator().to(device)
+        generator = Generator().to(device)
 
-    # TODO: give different input values to the generator
-    generator_input = torch.tensor([0.5]).to(device)
+        target_real = torch.tensor([1.0]).to(device)
+        target_generated = torch.tensor([0.0]).to(device)
 
-    EPOCHS = 10_000
-    for epoch in range(1, EPOCHS + 1):
-        if epoch % 1000 == 0:
-            print(f"Epoch {epoch}")
-        discriminator.train(generate_real().to(device), target_real)
-        # TODO: merge these two steps
-        discriminator.train(generator.forward(generator_input), target_generated)
-        generator.train(discriminator, generator_input, target_real)
+        # TODO: give different input values to the generator
+        generator_input = torch.tensor([0.5]).to(device)
+
+        EPOCHS = 10_000
+        for epoch in range(1, EPOCHS + 1):
+            discriminator.train(generate_real().to(device), target_real)
+            discriminator.train(
+                generator.forward(generator_input).detach(),
+                target_generated,
+            )
+            generator.train(discriminator, generator_input, target_real)
+            if epoch % 1000 == 0 or epoch == EPOCHS:
+                print(f"Epoch {epoch}/{EPOCHS}")
+
+        pickle.dump(
+            {"discriminator": discriminator, "generator": generator},
+            open(PKL_GAN_MODELS, "wb"),
+        )
 
     if PLOTS:
-        plots(discriminator)
+        plots(discriminator, generator)
 
 
 if __name__ == "__main__":
