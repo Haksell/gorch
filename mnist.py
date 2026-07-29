@@ -1,3 +1,5 @@
+# ruff: noqa: SIM115
+
 import pickle
 
 import matplotlib.pyplot as plt
