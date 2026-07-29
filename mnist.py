@@ -1,5 +1,3 @@
-# TODO: batch training with a DataLoader
-
 import pickle
 
 import matplotlib.pyplot as plt
@@ -7,23 +5,28 @@ import pandas as pd
 import torch
 import torch.nn.functional as F
 from torch import nn
-from torch.utils.data import Dataset
+from torch.utils.data import DataLoader, Dataset
+
+EPOCHS = 8
+BATCH_SIZE = 256
+
+HIDDEN_NODES = 128
+
+PLOTS = False
+TEST_IDX = 33
 
 
 class Classifier(nn.Module):
     def __init__(self):
         super().__init__()
-        # TODO: 256 hidden nodes
         self.model = nn.Sequential(
-            nn.Linear(784, 200),
+            nn.Linear(784, HIDDEN_NODES),
             nn.LeakyReLU(0.02),
-            nn.LayerNorm(200),
-            nn.Linear(200, 10),
-            nn.LeakyReLU(0.02),  # TODO: Softmax?
+            nn.LayerNorm(HIDDEN_NODES),
+            nn.Linear(HIDDEN_NODES, 10),
         )
-        self.loss_function = nn.MSELoss()  # TODO: CrossEntropyLoss
+        self.loss_function = nn.CrossEntropyLoss()
         self.optimizer = torch.optim.Adam(self.parameters())
-        self.counter = 0
         self.progress = []
 
     def forward(self, inputs):
@@ -35,23 +38,11 @@ class Classifier(nn.Module):
         self.optimizer.zero_grad()
         loss.backward()
         self.optimizer.step()
-
-        self.counter += 1
-        if self.counter % 10 == 0:
-            self.progress.append(loss.item())
-        if self.counter % 1000 == 0:
-            print(f"{self.counter=}")
+        self.progress.append(loss.item())
 
     def plot_progress(self):
         df = pd.DataFrame(self.progress, columns=["loss"])
-        df.plot(
-            ylim=(0, 1),
-            figsize=(16, 8),
-            alpha=0.1,
-            marker=".",
-            grid=True,
-            yticks=(0, 0.25, 0.5),
-        )
+        df.plot(ylim=(0, 1), figsize=(16, 8), marker=".", grid=True)
 
 
 class MNIST(Dataset):
@@ -63,14 +54,13 @@ class MNIST(Dataset):
         self.images = torch.from_numpy(images).to(device)
 
         labels = df.iloc[:, 0].to_numpy(dtype="int64", copy=True)
-        self.labels = torch.from_numpy(labels)
-        self.targets = F.one_hot(self.labels, 10).to(device)
+        self.labels = torch.from_numpy(labels).to(device)
 
     def __len__(self):
         return len(self.labels)
 
     def __getitem__(self, index):
-        return self.labels[index], self.images[index], self.targets[index]
+        return self.images[index], self.labels[index]
 
     def plot_image(self, index):
         img = self.images[index].reshape(28, 28).to("cpu")
@@ -78,9 +68,40 @@ class MNIST(Dataset):
         plt.imshow(img, interpolation="none", cmap="Blues")
 
 
+def test_accuracy(classifier, mnist_test):
+    score = items = 0
+    for image, label in mnist_test:
+        with torch.no_grad():
+            output = classifier.forward(image.unsqueeze(0))
+            answer = output.detach().cpu().numpy().argmax()
+        if answer == label.item():
+            score += 1
+        items += 1
+    print(f"Accuracy: {score}/{items} = {score / items:.2%}")
+
+
+def plots(classifier, mnist_test):
+    image, _ = mnist_test[TEST_IDX]
+
+    with torch.no_grad():
+        output = classifier.forward(image.unsqueeze(0))
+        output = F.softmax(output, dim=1).squeeze()
+
+    pd.DataFrame(output.detach().cpu().numpy()).plot(
+        kind="bar", legend=False, ylim=(0, 1)
+    )
+    plt.show()
+
+    mnist_test.plot_image(TEST_IDX)
+    plt.show()
+
+    classifier.plot_progress()
+    plt.show()
+
+
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"Running on {device}")
+    print(f"Running on {str(device).upper()}.")
 
     PKL_TRAIN = "pkl/mnist_train.pkl"
     PKL_TEST = "pkl/mnist_test.pkl"
@@ -100,39 +121,19 @@ def main():
 
     try:
         classifier = pickle.load(open(PKL_CLASSIFIER, "rb"))
+        test_accuracy(classifier, mnist_test)
     except FileNotFoundError:
-        EPOCHS = 1
         classifier = Classifier().to(device)
+        data_loader = DataLoader(mnist_train, batch_size=BATCH_SIZE, shuffle=True)
         for epoch in range(1, EPOCHS + 1):
-            print(f"Training epoch {epoch}/{EPOCHS}")
-            for _, image_tensor, target_tensor in mnist_train:
-                classifier.train(image_tensor, target_tensor)
+            print(f"Training epoch {epoch}/{EPOCHS}...")
+            for images, labels in data_loader:
+                classifier.train(images, labels)
+            test_accuracy(classifier, mnist_test)
         pickle.dump(classifier, open(PKL_CLASSIFIER, "wb"))
 
-    PLOTS = False
     if PLOTS:
-        TEST_IDX = 33
-        image = mnist_test[TEST_IDX][1]
-        output = classifier.forward(image)
-
-        pd.DataFrame(output.detach().cpu().numpy()).plot(
-            kind="bar", legend=False, ylim=(0, 1)
-        )
-        plt.show()
-
-        mnist_test.plot_image(TEST_IDX)
-        plt.show()
-
-        classifier.plot_progress()
-        plt.show()
-
-    score = items = 0
-    for label, image_tensor, _ in mnist_test:
-        answer = classifier.forward(image_tensor).detach().cpu().numpy().argmax()
-        if answer == label:
-            score += 1
-        items += 1
-    print(score, items, score / items)
+        plots(classifier, mnist_test)
 
 
 if __name__ == "__main__":
