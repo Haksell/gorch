@@ -17,6 +17,7 @@ class Classifier(nn.Module):
         self.model = nn.Sequential(
             nn.Linear(784, 200),
             nn.LeakyReLU(0.02),
+            nn.LayerNorm(200),
             nn.Linear(200, 10),
             nn.LeakyReLU(0.02),  # TODO: Softmax?
         )
